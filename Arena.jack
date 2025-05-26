@@ -1,0 +1,191 @@
+/** Represents the game arena with obstacles and cover elements */
+class Arena {
+    field Array obstacles;     // Array of obstacle coordinates
+    field Array coverWalls;    // Array of cover wall coordinates
+    field int obstacleCount;   // Number of obstacles
+    field int wallCount;       // Number of cover walls
+    field int width, height;   // Arena dimensions
+    
+    /** Creates a new arena */
+    constructor Arena new() {
+        let width = 512;
+        let height = 256;
+        
+        // Initialize arrays (increased size for more elements)
+        let obstacles = Array.new(40);  // x,y pairs for each obstacle
+        let coverWalls = Array.new(40); // x,y,length,isVertical for each wall
+        let obstacleCount = 0;
+        let wallCount = 0;
+        
+        // Create defensive walls near spawn points
+        do addCoverWall(100, 100, 40, true);   // Left side vertical wall
+        do addCoverWall(412, 100, 40, true);   // Right side vertical wall
+        
+        // Create center cover elements
+        do addCoverWall(240, 60, 30, false);   // Top horizontal wall
+        do addCoverWall(240, 190, 30, false);  // Bottom horizontal wall
+        
+        // Add diagonal cover elements
+        do addObstacle(180, 80);   // Top left
+        do addObstacle(180, 176);  // Bottom left
+        do addObstacle(332, 80);   // Top right
+        do addObstacle(332, 176);  // Bottom right
+        
+        // Add center cross
+        do addCoverWall(251, 118, 20, true);   // Vertical part
+        do addCoverWall(241, 128, 20, false);  // Horizontal part
+        
+        // Add some random small obstacles for variety
+        do addObstacle(150, 128);  // Mid-left
+        do addObstacle(362, 128);  // Mid-right
+        do addObstacle(256, 30);   // Top center
+        do addObstacle(256, 226);  // Bottom center
+        
+        return this;
+    }
+    
+    /** Adds a cover wall with specified dimensions */
+    method void addCoverWall(int x, int y, int length, boolean isVertical) {
+        let coverWalls[wallCount] = x;
+        let coverWalls[wallCount + 1] = y;
+        let coverWalls[wallCount + 2] = length;
+        let coverWalls[wallCount + 3] = isVertical;
+        let wallCount = wallCount + 4;
+        return;
+    }
+    
+    /** Adds an obstacle at specified coordinates */
+    method void addObstacle(int x, int y) {
+        let obstacles[obstacleCount] = x;
+        let obstacles[obstacleCount + 1] = y;
+        let obstacleCount = obstacleCount + 2;
+        return;
+    }
+    
+    /** Draws the arena and all elements */
+    method void draw() {
+        var int i;
+        
+        // Draw border
+        do Screen.setColor(true);
+        do Screen.drawRectangle(0, 0, width-1, 0);      // Top
+        do Screen.drawRectangle(0, height-1, width-1, height-1);  // Bottom
+        do Screen.drawRectangle(0, 0, 0, height-1);      // Left
+        do Screen.drawRectangle(width-1, 0, width-1, height-1);  // Right
+        
+        // Draw middle divider (dashed line)
+        let i = 0;
+        while (i < height) {
+            if ((i / 8) & 1) {  // Create dashed effect
+                do Screen.drawRectangle(width/2 - 1, i, width/2 + 1, i + 4);
+            }
+            let i = i + 8;
+        }
+        
+        // Draw cover walls
+        let i = 0;
+        while (i < wallCount) {
+            do drawWall(
+                coverWalls[i],      // x
+                coverWalls[i + 1],  // y
+                coverWalls[i + 2],  // length
+                coverWalls[i + 3]   // isVertical
+            );
+            let i = i + 4;
+        }
+        
+        // Draw obstacles
+        let i = 0;
+        while (i < obstacleCount) {
+            do drawObstacle(obstacles[i], obstacles[i+1]);
+            let i = i + 2;
+        }
+        
+        return;
+    }
+    
+    /** Draws a cover wall */
+    method void drawWall(int x, int y, int length, boolean isVertical) {
+        do Screen.setColor(true);
+        if (isVertical) {
+            // Vertical wall (3 pixels wide)
+            do Screen.drawRectangle(x-1, y, x+1, y+length);
+        } else {
+            // Horizontal wall (3 pixels tall)
+            do Screen.drawRectangle(x, y-1, x+length, y+1);
+        }
+        return;
+    }
+    
+    /** Draws a single obstacle */
+    method void drawObstacle(int x, int y) {
+        do Screen.setColor(true);
+        // Draw a smaller 12x12 obstacle
+        do Screen.drawRectangle(x-6, y-6, x+6, y+6);
+        return;
+    }
+    
+    /** Checks if given coordinates collide with any arena element */
+    method boolean checkCollision(int x, int y, int size) {
+        var int i, obsX, obsY, wallX, wallY, wallLen;
+        var boolean isVert;
+        var int halfSize;
+        let halfSize = size / 2;
+        
+        // Check arena boundaries
+        if ((x < halfSize) | (x > (width - halfSize)) |
+            (y < halfSize) | (y > (height - halfSize))) {
+            return true;
+        }
+        
+        // Check obstacles
+        let i = 0;
+        while (i < obstacleCount) {
+            let obsX = obstacles[i];
+            let obsY = obstacles[i+1];
+            
+            // Simple box collision check
+            if ((Math.abs(x - obsX) < (12 + halfSize)) & 
+                (Math.abs(y - obsY) < (12 + halfSize))) {
+                return true;
+            }
+            let i = i + 2;
+        }
+        
+        // Check cover walls
+        let i = 0;
+        while (i < wallCount) {
+            let wallX = coverWalls[i];
+            let wallY = coverWalls[i + 1];
+            let wallLen = coverWalls[i + 2];
+            let isVert = coverWalls[i + 3];
+            
+            if (isVert) {
+                // Vertical wall collision
+                if ((Math.abs(x - wallX) < (3 + halfSize)) & 
+                    (y > (wallY - halfSize)) & 
+                    (y < (wallY + wallLen + halfSize))) {
+                    return true;
+                }
+            } else {
+                // Horizontal wall collision
+                if ((Math.abs(y - wallY) < (3 + halfSize)) & 
+                    (x > (wallX - halfSize)) & 
+                    (x < (wallX + wallLen + halfSize))) {
+                    return true;
+                }
+            }
+            let i = i + 4;
+        }
+        
+        return false;
+    }
+    
+    /** Disposes of the arena and its elements */
+    method void dispose() {
+        do obstacles.dispose();
+        do coverWalls.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+}

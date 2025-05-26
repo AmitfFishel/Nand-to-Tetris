@@ -1,0 +1,312 @@
+// This class represents a tank controlled by a player
+class Tank {
+    field int x, y;           // Tank position
+    field int lastX, lastY;   // Previous position for undoing moves
+    field int startXpos, startYpos; // Initial position
+    field int direction;      // 0=up, 1=right, 2=down, 3=left
+    field int health;         // Tank health
+    field boolean isMoving;   // Movement state
+    field Array bullets;      // Array of bullets
+    field int bulletCount;    // Current number of active bullets
+    
+    // Creates a new tank 
+    constructor Tank new(int startX, int startY, int startDir) {
+        let x = startX;
+        let y = startY;
+        let lastX = startX;
+        let lastY = startY;
+        let startXpos = startX;
+        let startYpos = startY;
+        let direction = startDir;
+        let health = 3;
+        let isMoving = false;
+        
+        // Initialize bullet array (max 5 bullets)
+        let bullets = Array.new(5);
+        let bulletCount = 0;
+        
+        return this;
+    }
+    
+    // Moves the tank up 
+    method void moveUp() {
+        if (y > 20) {  // Increased margin for safety
+            do erase();
+            let lastX = x;
+            let lastY = y;
+            let y = y - 5;
+            let direction = 0;
+            let isMoving = true;
+            do draw();
+        }
+        return;
+    }
+    
+    // Moves the tank down 
+    method void moveDown() {
+        if (y < 235) {  // Adjusted for screen height and tank size
+            do erase();
+            let lastX = x;
+            let lastY = y;
+            let y = y + 5;
+            let direction = 2;
+            let isMoving = true;
+            do draw();
+        }
+        return;
+    }
+    
+    // Moves the tank left 
+    method void moveLeft() {
+        if (x > 20) {  // Increased margin for safety
+            do erase();
+            let lastX = x;
+            let lastY = y;
+            let x = x - 5;
+            let direction = 3;
+            let isMoving = true;
+            do draw();
+        }
+        return;
+    }
+    
+    // Moves the tank right 
+    method void moveRight() {
+        if (x < 491) {  // Adjusted for screen width and tank size
+            do erase();
+            let lastX = x;
+            let lastY = y;
+            let x = x + 5;
+            let direction = 1;
+            let isMoving = true;
+            do draw();
+        }
+        return;
+    }
+    
+    //Shoots a bullet 
+    method void shoot() {
+    var int i;
+    var int bulletX, bulletY;
+    var Bullet currentBullet;
+    
+    // First clean up any inactive bullets to prevent heap overflow
+    let i = 0;
+    while (i < 5) {
+        let currentBullet = bullets[i];
+        if (~(currentBullet = null) & ~(currentBullet.isActive())) {
+            do currentBullet.dispose();
+            let bullets[i] = null;
+            let bulletCount = bulletCount - 1;
+        }
+        let i = i + 1;
+    }
+    
+    // Then look for an empty slot
+    let i = 0;
+    while ((i < 5) & (bulletCount < 5)) {
+        if (bullets[i] = null) {
+            // Calculate bullet starting position based on direction
+            if (direction = 0) { 
+                let bulletX = x;
+                let bulletY = y - 12;  // Increased distance from tank
+            }
+            if (direction = 1) { 
+                let bulletX = x + 12;
+                let bulletY = y; 
+            }
+            if (direction = 2) { 
+                let bulletX = x;
+                let bulletY = y + 12; 
+            }
+            if (direction = 3) { 
+                let bulletX = x - 12;
+                let bulletY = y; 
+            }
+            
+            let bullets[i] = Bullet.new(bulletX, bulletY, direction);
+            let bulletCount = bulletCount + 1;
+            return;
+        }
+        let i = i + 1;
+    }
+    return;
+}
+    
+    // Updates tank state 
+    method void update() {
+        // Combined tank and bullet updates
+        var int i;
+        var Bullet currentBullet;
+        let i = 0;
+        
+        while (i < 5) {  // Check all bullet slots
+            let currentBullet = bullets[i];
+            if (~(currentBullet = null)) {
+                if (currentBullet.isActive()) {
+                    do currentBullet.update();
+                    
+                    if (currentBullet.isOutOfBounds()) {
+                        do currentBullet.dispose();
+                        let bullets[i] = null;
+                        let bulletCount = bulletCount - 1;
+                    }
+                } else {
+                    do currentBullet.dispose();
+                    let bullets[i] = null;
+                    let bulletCount = bulletCount - 1;
+                }
+            }
+            let i = i + 1;
+        }
+        return;
+    }
+
+
+    
+    // Draws the tank and all its active bullets 
+    method void draw() {
+        var int tankSize;
+        var int i;
+        var Bullet currentBullet;
+        
+        let tankSize = 7;  // Half of tank size (14x14 total)
+        
+        do Screen.setColor(true);
+        
+        // Draw tank body (smaller size for safety)
+        do Screen.drawRectangle(x-tankSize, y-tankSize, x+tankSize, y+tankSize);
+        
+        // Draw cannon based on direction (longer and wider)
+        if (direction = 0) { 
+            do Screen.drawRectangle(x-2, y-(tankSize+8), x+2, y-tankSize); }  // Up
+        if (direction = 1) { 
+            do Screen.drawRectangle(x+tankSize, y-2, x+(tankSize+8), y+2); }  // Right
+        if (direction = 2) { 
+            do Screen.drawRectangle(x-2, y+tankSize, x+2, y+(tankSize+8)); }  // Down
+        if (direction = 3) { 
+            do Screen.drawRectangle(x-(tankSize+8), y-2, x-tankSize, y+2); }  // Left
+            
+        // Draw all active bullets
+        let i = 0;
+        while (i < 5) {
+            let currentBullet = bullets[i];
+            if ((~(currentBullet = null)) & currentBullet.isActive()) {
+                do currentBullet.draw();
+            }
+            let i = i + 1;
+        }
+        
+        return;
+    }
+    
+    // Erases the tank 
+    method void erase() {
+    var int eraseSize;
+    var int x1, y1, x2, y2;
+    let eraseSize = 11;
+    
+    // Calculate coordinates with boundary checks
+    // For x1: if (x-eraseSize < 0) use 0, else use x-eraseSize
+    if ((x-eraseSize) < 0) {
+        let x1 = 0;
+    } else {
+        let x1 = x-eraseSize;
+    }
+    
+    // For y1: if (y-eraseSize < 0) use 0, else use y-eraseSize
+    if ((y-eraseSize) < 0) {
+        let y1 = 0;
+    } else {
+        let y1 = y-eraseSize;
+    }
+    
+    // For x2: if (x+eraseSize > 511) use 511, else use x+eraseSize
+    if ((x+eraseSize) > 511) {
+        let x2 = 511;
+    } else {
+        let x2 = x+eraseSize;
+    }
+    
+    // For y2: if (y+eraseSize > 255) use 255, else use y+eraseSize
+    if ((y+eraseSize) > 255) {
+        let y2 = 255;
+    } else {
+        let y2 = y+eraseSize;
+    }
+    
+    do Screen.setColor(false);
+    do Screen.drawRectangle(x1, y1, x2, y2);
+    return;
+}
+    
+    // Gets X coordinate 
+    method int getX() {
+        return x;
+    }
+    
+    // Gets Y coordinate 
+    method int getY() {
+        return y;
+    }
+    
+    // Gets current health 
+    method int getHealth() {
+        return health;
+    }
+    
+    // Gets bullet count 
+    method int getBulletCount() {
+        return bulletCount;
+    }
+    
+    // Gets bullet at specified index 
+    method Bullet getBullet(int index) {
+        return bullets[index];
+    }
+    
+    // Damages the tank 
+    method void damage() {
+        let health = health - 1;
+        return;
+    }
+    
+    // Undoes the last move (for collision response) 
+    method void undoMove() {
+        let x = lastX;
+        let y = lastY;
+        do draw();
+        return;
+    }
+
+    // Resets the tank to its initial position 
+    method void resetPosition() {
+    do erase();  // Erase current position
+    let x = startXpos;
+    let y = startYpos;
+    let lastX = startXpos;
+    let lastY = startYpos;
+    do draw();  // Draw at new position
+    return;
+}
+
+    
+    // Disposes the tank and its bullets 
+    method void dispose() {
+        var int i;
+        var Bullet currentBullet;
+        let i = 0;
+        
+        while (i < 5) {  // Clean up all bullet slots
+            let currentBullet = bullets[i];
+            if (~(currentBullet = null)) {
+                do currentBullet.dispose();
+            }
+            let i = i + 1;
+        }
+        
+        do bullets.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+}

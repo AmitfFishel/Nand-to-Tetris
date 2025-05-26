@@ -1,0 +1,537 @@
+// This class handles the main game logic for Tank Battle
+class Game {
+    
+    field Tank tank1, tank2;
+    field Arena arena;
+    field boolean gameOver;
+    field int score1, score2;
+    field String strP1, strP2;
+    field String PlayerString;
+    field String MoveString;
+    field String ShootString;
+    field String hitMessage;            // Message for hit notifications
+    //field String HideString;
+    field String SwitchString;
+    field String finishscreen1 , finishscreen2, finishscreen3, finishscreen4;
+    field boolean showingInstructions;  
+    field boolean showHitMessage;
+    field int hitDisplayTimer;
+
+    /// Start Instructions
+    field String line1, line2, line3, line4, line5, line6;
+    // title screen strings
+    field String title1, title2;
+
+    field int currentPlayer;    // 1 or 2
+    field int currentPhase;     // 0=move, 1=shoot, 2=hide
+    field int phaseTimer;       // Counts down time in current phase
+    field boolean hasFired;     // Tracks if player has fired in shoot phase
+    
+    // Phase duration constants
+    field int MOVE_PHASE_TIME;  // 60 ticks = 3 seconds at 20fps
+    field int SHOOT_PHASE_TIME; // 20 ticks = 1 second
+    field int SWITCH_PHASE_TIME;  // 20 ticks = 1 second
+    
+    // Creates a new game 
+    constructor Game new() {
+        let gameOver = false;
+        let showingInstructions = true;
+        let showHitMessage = false;
+        let score1 = 0;
+        let score2 = 0;
+        let hitDisplayTimer = 0;
+        //Initialize display strings
+        let strP1 = "P1: ";
+        let strP2 = "P2: ";
+        let PlayerString = "Player ";
+        let MoveString = " Move! ";
+        let ShootString = " SHOOT! ";
+        let SwitchString = "Switching... ";
+        let hitMessage = "Hit!!!";
+        //Instructions text
+        let line1 = "Welcome to Tank Battle!";
+        let line2 = "Player 1: W,A,S,D and E to shoot";
+        let line3 = "Player 2: Arrow keys and Space to shoot";
+        let line4 = "Hit your enemy 3 times to win!";
+        let line5 = "Press Q to quit at any time";
+        let line6 = "The game will start soon. GOOD LUCK!";
+
+        //title screen strings
+        let title1 = "Welcome to Tanks Battle Arena";
+        let title2 = "Press any key to start";
+
+        //end screen strings
+        let finishscreen1 = "Player 1 Wins!";
+        let finishscreen2 = "Player 2 Wins!";
+        let finishscreen3 = "Final Score: ";
+        let finishscreen4 = " - ";
+
+        //  Initialize objects
+        let arena = Arena.new();
+        let tank1 = Tank.new(50, 128, 1);
+        let tank2 = Tank.new(461, 128, 3);
+        
+        // Initialize turn system
+        let currentPlayer = 1;
+        let currentPhase = 0;
+        let MOVE_PHASE_TIME = 100;
+        let SHOOT_PHASE_TIME = 0;
+        let SWITCH_PHASE_TIME = 20;
+        let phaseTimer = MOVE_PHASE_TIME;
+        let hasFired = false;
+        
+        return this;
+    }
+    
+    // Updates the game phase based on the timer
+    method void updatePhase() {
+        let phaseTimer = phaseTimer - 1;
+        
+        // Don't let timer go below 0
+        if (phaseTimer < 0) {
+            let phaseTimer = 0;
+        }
+
+        // Phase transitions
+        if (phaseTimer = 0) {  // Only trigger when exactly 0
+            if (currentPhase = 0) {  // Move phase ended
+                let currentPhase = 1;  // Switch to shoot phase
+                let phaseTimer = SHOOT_PHASE_TIME;
+                let hasFired = false;
+            } else { 
+                if (currentPhase = 1) {  // Shoot phase ended
+                    let currentPhase = 2;  // Switch to hide phase
+                    let phaseTimer = SWITCH_PHASE_TIME;
+                } else {  // Hide phase ended
+                    let currentPhase = 0;  // Back to move phase
+                    let phaseTimer = MOVE_PHASE_TIME;
+                    // Switch players
+                    if (currentPlayer = 1) {
+                        let currentPlayer = 2;
+                    } else {
+                        let currentPlayer = 1;
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // New method to display instructions
+    method void showInstructions() {
+        do Screen.clearScreen();
+        do Output.moveCursor(3, 17);
+        do Output.printString(line1);
+        do Output.moveCursor(8, 17);
+        do Output.printString(line2);
+        do Output.moveCursor(10, 17);
+        do Output.printString(line3);
+        do Output.moveCursor(12, 17);
+        do Output.printString(line4);
+        do Output.moveCursor(14, 17);
+        do Output.printString(line5);
+        do Output.moveCursor(18, 17);
+        do Output.printString(line6);
+        
+        // Clean up strings
+        do line1.dispose();
+        do line2.dispose();
+        do line3.dispose();
+        do line4.dispose();
+        do line5.dispose();
+        do line6.dispose();
+        
+        return;
+    }
+
+        // Checks for collisions in the game
+    method void checkCollisions() {
+        var int i;
+        var Bullet currentBullet;
+        var int tankSize;
+        let tankSize = 16;  // Tank is 16x16 pixels
+        
+        // Check tank collisions with arena obstacles
+        if (arena.checkCollision(tank1.getX(), tank1.getY(), tankSize)) {
+            do tank1.undoMove();
+        }
+        if (arena.checkCollision(tank2.getX(), tank2.getY(), tankSize)) {
+            do tank2.undoMove();
+        }
+        
+        // Check bullet collisions for tank1
+        let i = 0;
+        while (i < tank1.getBulletCount()) {
+            let currentBullet = tank1.getBullet(i);
+            if (~(currentBullet = null)) {
+                // Check if bullet hit tank2
+                if (currentBullet.hitTest(tank2.getX(), tank2.getY(), tankSize)) {
+                    do tank2.damage();
+                    do currentBullet.deactivate();
+                    let score1 = score1 + 1;
+                    do tank2.resetPosition();
+                    let showHitMessage = true;
+                    let hitDisplayTimer = 20;
+                }
+                // Check if bullet hit obstacles
+                if (arena.checkCollision(currentBullet.getX(), currentBullet.getY(), 2)) {
+                    do currentBullet.deactivate();
+                }
+            }
+            let i = i + 1;
+        }
+        
+        // Check bullet collisions for tank2
+        let i = 0;
+        while (i < tank2.getBulletCount()) {
+            let currentBullet = tank2.getBullet(i);
+            if (~(currentBullet = null)) {
+                // Check if bullet hit tank1
+                if (currentBullet.hitTest(tank1.getX(), tank1.getY(), tankSize)) {
+                    do tank1.damage();
+                    do currentBullet.deactivate();
+                    let score2 = score2 + 1;
+                    do tank1.resetPosition();
+                    let showHitMessage = true;
+                    let hitDisplayTimer = 20;
+                }
+                // Check if bullet hit obstacles
+                if (arena.checkCollision(currentBullet.getX(), currentBullet.getY(), 2)) {
+                    do currentBullet.deactivate();
+                }
+            }
+            let i = i + 1;
+        }
+        
+        // Check if game is over (if any tank's health reaches 0)
+        if ((tank1.getHealth() = 0) | (tank2.getHealth() = 0)) {
+            let gameOver = true;
+        }
+        
+        return;
+    }
+
+    // Handles input based on current phase
+    method void handleInput(char key) {
+    var Tank currentTank;
+    if (currentPlayer = 1) {
+        let currentTank = tank1;
+    } else {
+        let currentTank = tank2;
+    }
+    
+    
+    if (currentPhase = 0) {  // During main phase
+        // Movement controls
+        if (currentPlayer = 1) {
+            if (key = 119) { do currentTank.moveUp(); }    // W
+            if (key = 115) { do currentTank.moveDown(); }  // S
+            if (key = 97) { do currentTank.moveLeft(); }   // A
+            if (key = 100) { do currentTank.moveRight(); } // D
+            if ((key = 101) & (~hasFired)) {  // E to shoot
+                do currentTank.shoot();
+                let hasFired = true;
+            }
+        } else {
+            if (key = 131) { do currentTank.moveUp(); }    // Up
+            if (key = 133) { do currentTank.moveDown(); }  // Down
+            if (key = 130) { do currentTank.moveLeft(); }  // Left
+            if (key = 132) { do currentTank.moveRight(); } // Right
+            if ((key = 32) & (~hasFired)) {   // Space to shoot
+                do currentTank.shoot();
+                let hasFired = true;
+            }
+        }
+    }
+    
+    if (key = 81) { let gameOver = true; }  // Q to quit
+    return;
+}
+    
+    //Displays current phase information 
+    method void drawPhaseInfo() {
+    var int hitDisplayTime;
+    let hitDisplayTime = 20; // How long to show hit message (in ticks)
+
+    do Output.moveCursor(0, 25);  // Center top
+
+    // Show hit message if recent hit occurred
+    if (showHitMessage) {
+        do Output.printString(hitMessage);
+        let hitDisplayTimer = hitDisplayTimer - 1;
+        if (hitDisplayTimer < 0) {
+            let showHitMessage = false;
+            let hitDisplayTimer = hitDisplayTime;
+        }
+        return;
+    }
+    
+    if (currentPhase = 0) {
+        do Output.printString(PlayerString);
+        do Output.printInt(currentPlayer);
+        do Output.printString(MoveString);
+        do Output.printInt(phaseTimer / 20);
+    } 
+    if (currentPhase = 1) {
+        do Output.printString(ShootString);
+        do Output.printInt(phaseTimer / 20);
+    }
+    if (currentPhase = 2) {
+        do Output.printString(SwitchString);
+        do Output.printInt(phaseTimer / 20);
+    }
+    
+    return;
+    }
+    
+    // Main game loop updated for turn system 
+    method void run() {
+        var char key;
+        var String instructionStr;
+
+      // Show title screen first
+        do showTitleScreen();
+        do Sys.wait(500);
+        do Screen.clearScreen();
+
+
+    // Start Instructions
+        do showInstructions();
+        do Sys.wait(5000);
+        do Screen.clearScreen();
+    
+
+    // Clean up previous game objects if they exist
+    if (~(tank1 = null)) { do tank1.dispose(); }
+    if (~(tank2 = null)) { do tank2.dispose(); }
+    if (~(arena = null)) { do arena.dispose(); }
+    
+    // Initialize new game objects
+    let arena = Arena.new();
+    let tank1 = Tank.new(50, 128, 1);
+    let tank2 = Tank.new(461, 128, 3);
+        
+        while (~gameOver) {
+            let key = Keyboard.keyPressed();
+
+            // Ensure strings are disposed after each frame
+            if (~(instructionStr = null)) {
+                do instructionStr.dispose();
+            }
+
+            if ((score1 = 3) | (score2 = 3)) {
+            let gameOver = true;
+            }
+
+            do handleInput(key);
+            
+            do updatePhase();
+            do tank1.update();
+            do tank2.update();
+            do checkCollisions();
+            
+            do Screen.clearScreen();
+            do arena.draw();
+            do tank1.draw();
+            do tank2.draw();
+            do drawScore();
+            do drawPhaseInfo();
+            
+            do Sys.wait(50);  // 20fps
+        }
+
+        if (gameOver) {
+        do showFinishScreen();
+        do Sys.wait(5000);
+        }
+
+        return;
+    }
+
+    // Displays current scores 
+    method void drawScore() {
+        var String str;
+        
+        // Display P1 score
+        do Output.moveCursor(0, 0);
+        do Output.printString(strP1);
+        do Output.printInt(score1);
+        
+        
+        // Display P2 score
+        do Output.moveCursor(0, 55);
+        do Output.printString(strP2);
+        do Output.printInt(score2);
+        
+        
+        return;
+    }
+
+    // Displays the tank at the start of the game
+   method void showTitleScreen() {
+    var int baseX, baseY;
+    var int x;
+    var int bulletX, bulletY;
+    var int timer;
+    let baseX = 80;  // Center position for tank
+    let baseY = 120;
+    let timer = 0;   // Timer for periodic shooting
+    
+    // Clear the screen first
+    do Screen.clearScreen();
+    do Screen.setColor(true);
+    
+    // Draw the initial scene
+    do drawTankScene(baseX, baseY);
+    
+    // Main animation loop - continues until key press
+    while (Keyboard.keyPressed() = 0) {
+        let timer = timer + 1;
+        
+        // Start new bullet every 40 ticks (2 seconds)
+        if (timer = 1) {
+            let bulletX = baseX + 200;  // Start at cannon end
+            let bulletY = baseY - 15;   // Align with cannon center
+            
+            // Animate single bullet
+            while ((bulletX < 460) & (Keyboard.keyPressed() = 0)) {
+                // Draw bullet
+                do Screen.setColor(true);
+                do Screen.drawRectangle(bulletX, bulletY, bulletX+10, bulletY+5);
+                
+                // Wait a bit
+                do Sys.wait(50);
+                
+                // Erase bullet
+                do Screen.setColor(false);
+                do Screen.drawRectangle(bulletX, bulletY, bulletX+10, bulletY+5);
+                
+                // Move bullet
+                let bulletX = bulletX + 10;
+                
+                // Redraw tank scene
+                do Screen.setColor(true);
+                do drawTankScene(baseX, baseY);
+            }
+            
+            let timer = 0;  // Reset timer for next shot
+        }
+        
+        // Keep scene fresh
+        do drawTankScene(baseX, baseY);
+        do Sys.wait(50);
+    }
+    
+    // Wait for key release before continuing
+    while (~(Keyboard.keyPressed() = 0)) {
+        // Wait for release
+    }
+    
+    return;
+}
+
+    // Helper method to draw the tank and scene
+    method void drawTankScene(int baseX, int baseY) {
+        var int x;
+        
+        // Draw tank body - main hull
+        do Screen.drawRectangle(baseX+40, baseY, baseX+160, baseY+40);
+        
+        // Draw tank turret
+        do Screen.drawRectangle(baseX+80, baseY-30, baseX+140, baseY);
+        
+        // Draw main cannon
+        do Screen.drawRectangle(baseX+100, baseY-20, baseX+200, baseY-10);
+        
+        // Draw treads base
+        do Screen.drawRectangle(baseX+20, baseY+40, baseX+180, baseY+50);
+        do Screen.drawRectangle(baseX+20, baseY+35, baseX+180, baseY+40);
+        
+        // Draw wheels (larger and more detailed)
+        let x = baseX + 30;
+        while (x < (baseX+170)) {
+            // Draw main wheel circle approximation
+            do Screen.drawRectangle(x, baseY+42, x+12, baseY+54);
+            // Add wheel detail
+            do Screen.setColor(false);
+            do Screen.drawRectangle(x+3, baseY+45, x+9, baseY+51);
+            do Screen.setColor(true);
+            let x = x + 25;
+        }
+        
+        // Draw tread details between wheels
+        let x = baseX + 20;
+        while (x < (baseX+180)) {
+            do Screen.drawRectangle(x, baseY+40, x+5, baseY+50);
+            let x = x + 15;
+        }
+        
+        // Draw hull details
+        do Screen.drawLine(baseX+60, baseY+10, baseX+140, baseY+10);
+        do Screen.drawLine(baseX+70, baseY+20, baseX+130, baseY+20);
+        
+        // Draw welcome text border and text
+        do Screen.drawRectangle(100, 30, 412, 60);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(102, 32, 410, 58);
+        do Screen.setColor(true);
+        do Output.moveCursor(4, 18);
+        do Output.printString(title1);
+        
+        // Bottom prompt
+        do Output.moveCursor(22, 20);
+        do Output.printString(title2);
+
+        return;
+    }
+
+
+    // Displays the finish screen
+    method void showFinishScreen() {
+    do Screen.clearScreen();
+    do Output.moveCursor(10, 25);
+    if (score1 = 3) {
+        do Output.printString(finishscreen1);
+    } else {
+        do Output.printString(finishscreen2);
+    }
+    do Output.moveCursor(12, 25);
+    do Output.printString(finishscreen3);
+    do Output.printInt(score1);
+    do Output.printString(finishscreen4);
+    do Output.printInt(score2);
+    return;
+}
+
+    // Disposes of the game objects 
+    method void dispose() {
+        if (~(tank1 = null)) { do tank1.dispose(); }
+        if (~(tank2 = null)) { do tank2.dispose(); }
+        if (~(arena = null)) { do arena.dispose(); }
+        if (~(strP1 = null)) { do strP1.dispose(); }
+        if (~(strP2 = null)) { do strP2.dispose(); }
+        if (~(line1 = null)) { do line1.dispose(); }
+        if (~(line2 = null)) { do line2.dispose(); }
+        if (~(line3 = null)) { do line3.dispose(); }
+        if (~(line4 = null)) { do line4.dispose(); }
+        if (~(line5 = null)) { do line5.dispose(); }
+        if (~(line6 = null)) { do line6.dispose(); }
+        if (~(title1 = null)) { do title1.dispose(); }
+        if (~(title2 = null)) { do title2.dispose(); }
+        if (~(PlayerString = null)) { do PlayerString.dispose(); }
+        if (~(MoveString = null)) { do MoveString.dispose(); }
+        if (~(ShootString = null)) { do ShootString.dispose(); }
+        if (~(hitMessage = null)) { do hitMessage.dispose(); }
+        if (~(SwitchString = null)) { do SwitchString.dispose(); }
+        if (~(finishscreen1 = null)) { do finishscreen1.dispose(); }
+        if (~(finishscreen2 = null)) { do finishscreen2.dispose(); }
+        if (~(finishscreen3 = null)) { do finishscreen3.dispose(); }
+        if (~(finishscreen4 = null)) { do finishscreen4.dispose(); }
+
+
+
+        do Memory.deAlloc(this);
+        return;
+    }
+
+}

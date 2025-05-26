@@ -1,0 +1,16 @@
+// Main entry point for the Tank Battle game 
+class Main {
+    // Initializes and starts the game 
+    function void main() {
+        var Game game;
+        
+        // Create and start a new game
+        let game = Game.new();
+        do game.run();
+        
+        // Clean up when game ends
+        do game.dispose();
+        
+        return;
+    }
+}

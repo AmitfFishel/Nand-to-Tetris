@@ -1,0 +1,111 @@
+// This class represents a bullet fired by a tank
+
+class Bullet {
+    field int x, y;           // Current position
+    field int direction;      // Direction of travel
+    field boolean active;     // Whether bullet is still active
+    field int speed;         // Movement speed
+    
+    // Constructor to create a new bullet will be called from Tank
+    constructor Bullet new(int startX, int startY, int dir) {
+        let x = startX;
+        let y = startY;
+        let direction = dir;
+        let active = true;
+        let speed = 15;  // Pixels per update
+        
+        return this;
+    }
+    
+    // Updates bullet position and checks the boundries while moving
+    method void update() {
+        if (active) {
+            if (~isOutOfBounds()) {
+                do erase();
+            }
+            
+            // Change position based on direction
+            if (direction = 0) { let y = y - speed; }     // Up
+            if (direction = 1) { let x = x + speed; }     // Right
+            if (direction = 2) { let y = y + speed; }     // Down
+            if (direction = 3) { let x = x - speed; }     // Left
+            
+            // Only draw if within safe bounds
+            if ((x > 2) & (x < 509) & (y > 2) & (y < 253)) {
+                do draw();
+            } else {
+                let active = false;
+            }
+        }
+        return;
+    }
+    
+    // Checks if the bullet is off the screen
+    method boolean isOutOfBounds() {
+        if ((x < 2) | (x > 509) | (y < 2) | (y > 253)) {
+            let active = false;
+            return true;
+        }
+        return false;
+    }
+    
+    // Draws the bullet on the screen
+    method void draw() {
+        if ((x > 2) & (x < 509) & (y > 2) & (y < 253)) {
+            do Screen.setColor(true);
+            // the bigger the number, the bigger the bullet (we need to change erase() too !!!!)
+            do Screen.drawRectangle(x-2, y-2, x+2, y+2);
+        }
+        return;
+    }
+    
+    //  Removes the bullet from the screen
+    method void erase() {
+        if ((x > 2) & (x < 509) & (y > 2) & (y < 253)) {
+            do Screen.setColor(false);
+            // Erase slightly larger area better safe then sorry (heap overflow :( )
+            do Screen.drawRectangle(x-3, y-3, x+3, y+3);
+        }
+        return;
+    }
+
+    // Deactivates the bullet
+    method void deactivate() {
+        let active = false;
+        do erase();
+        return;
+    }
+
+    // Returns the current X position of the bullet
+    method int getX() {
+        return x;
+    }
+    // Returns the current Y position of the bullet
+    method int getY() {
+        return y;
+    }
+    
+    
+    // Checks if the bullet hits the enemy tank
+    method boolean hitTest(int targetX, int targetY, int size) {
+        var int halfSize;
+        let halfSize = size / 2;
+        
+        return (x > (targetX - halfSize)) & 
+               (x < (targetX + halfSize)) & 
+               (y > (targetY - halfSize)) & 
+               (y < (targetY + halfSize));
+    }
+    
+    // Returns if the bullet is active
+    method boolean isActive() {
+        return active;
+    }
+    
+    // Frees memory and removes the bullet
+    method void dispose() {
+        do erase();  // Clean up visual artifacts
+        do Memory.deAlloc(this);
+        return;
+    }
+}
